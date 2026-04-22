@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulasi Gravitasi Planet</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #050505; color: white; font-family: sans-serif; }
+        canvas { display: block; }
+        #instructions {
+            position: absolute; top: 10px; left: 10px;
+            pointer-events: none;
+            background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="instructions">
+        <h3>Simulasi Gravitasi</h3>
+        <p>Klik & tahan untuk menambah planet baru</p>
+    </div>
+    <canvas id="simCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d');
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+// Konstanta Fisika (disesuaikan untuk simulasi visual)
+const G = 1; 
+const bodies = [];
+
+// Class untuk Planet/Benda Langit
+class Body {
+    constructor(x, y, vx, vy, radius, mass, color, isStatic = false) {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.radius = radius;
+        this.mass = mass;
+        this.color = color;
+        this.isStatic = isStatic; // Untuk matahari/benda pusat
+        this.trail = [];
+    }
+
+    draw() {
+        // Gambar jejak (trail)
+        ctx.beginPath();
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 0.5;
+        for (let i = 0; i < this.trail.length; i++) {
+            const p = this.trail[i];
+            ctx.lineTo(p.x, p.y);
+        }
+        ctx.stroke();
+
+        // Gambar planet
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.closePath();
+    }
+
+    update() {
+        if (this.isStatic) return;
+
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // Tambah jejak
+        this.trail.push({x: this.x, y: this.y});
+        if (this.trail.length > 50) this.trail.shift();
+    }
+}
+
+// Inisialisasi: Matahari di tengah
+const sun = new Body(canvas.width / 2, canvas.height / 2, 0, 0, 30, 5000, '#FDB813', true);
+bodies.push(sun);
+
+// Planet kecil awal
+bodies.push(new Body(canvas.width / 2, canvas.height / 2 - 200, 4.5, 0, 8, 10, '#4DA6FF'));
+
+// Logika Fisika Gravitasi
+function applyGravity() {
+    for (let i = 0; i < bodies.length; i++) {
+        for (let j = 0; j < bodies.length; j++) {
+            if (i === j) continue;
+
+            const b1 = bodies[i];
+            const b2 = bodies[j];
+
+            // Vektor jarak
+            const dx = b2.x - b1.x;
+            const dy = b2.y - b1.y;
+            const distanceSq = dx * dx + dy * dy;
+            const distance = Math.sqrt(distanceSq);
+
+            if (distance < (b1.radius + b2.radius)) continue; // Hindari tabrakan super intens
+
+            // Rumus Gravitasi Newton: F = G * m1 * m2 / r^2
+            const force = (G * b1.mass * b2.mass) / distanceSq;
+            
+            // Komponen gaya
+            const fx = force * (dx / distance);
+            const fy = force * (dy / distance);
+
+            // Percepatan: a = F / m
+            if (!b1.isStatic) {
+                b1.vx += fx / b1.mass;
+                b1.vy += fy / b1.mass;
+            }
+        }
+    }
+}
+
+// Animasi Loop
+function animate() {
+    // Efek fade untuk jejak lebih halus
+    ctx.fillStyle = 'rgba(5, 5, 5, 0.3)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    applyGravity();
+    
+    bodies.forEach(body => {
+        body.update();
+        body.draw();
+    });
+
+    requestAnimationFrame(animate);
+}
+
+// Interaksi Mouse
+let isDragging = false;
+let startX, startY;
+
+canvas.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+});
+
+canvas.addEventListener('mouseup', (e) => {
+    if (!isDragging) return;
+    isDragging = false;
+    
+    const endX = e.clientX;
+    const endY = e.clientY;
+
+    // Kecepatan awal berdasarkan tarikan mouse
+    const vx = (startX - endX) / 20;
+    const vy = (startY - endY) / 20;
+
+    // Tambah planet baru
+    bodies.push(new Body(endX, endY, vx, vy, 5, 5, `hsl(${Math.random() * 360}, 70%, 70%)`));
+});
+
+window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    sun.x = canvas.width / 2;
+    sun.y = canvas.height / 2;
+});
+
+animate();
+</script>
+</body>
+</html>
